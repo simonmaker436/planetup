@@ -125,7 +125,7 @@
     FX.estallido(x, y);
     FX.vibrar(15);
     globo('boost');
-    toast(`<img src="${IMG(id)}" alt="">+${Logic.retoPorId[id].pts} pts`);
+    toast(`<img src="${IMG(Logic.retoPorId[id].img || id)}" alt="">+${Logic.retoPorId[id].pts} pts`);
 
     const nuevo = Logic.nivelActual(Logic.puntosTotales(state)).actual;
     if (nuevo.n > nivelAntes) setTimeout(() => celebrar(nuevo), 500);

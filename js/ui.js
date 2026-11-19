@@ -49,7 +49,7 @@ const UI = (() => {
     const cat = CATEGORIAS[r.cat];
     return `
       <article class="reto ${hecho ? 'hecho' : ''}" data-abrir="${r.id}" style="--cat:${cat.color};--i:${i}">
-        <div class="reto-img">${img(r.id)}</div>
+        <div class="reto-img">${img(r.img || r.id)}</div>
         <div class="reto-info">
           <h4>${esc(r.titulo)}</h4>
           <p><span class="chip-cat">${cat.nombre}</span><span class="pts">+${r.pts} pts</span></p>
@@ -166,7 +166,7 @@ const UI = (() => {
           const hecho = hoy.includes(r.id), cat = CATEGORIAS[r.cat];
           return `<article class="tile ${hecho ? 'hecho' : ''}" data-abrir="${r.id}" style="--cat:${cat.color};--i:${i}">
             <button class="check" data-reto="${r.id}" aria-label="Marcar reto">${icono('check')}</button>
-            <div class="tile-img">${img(r.id)}</div>
+            <div class="tile-img">${img(r.img || r.id)}</div>
             <h4>${esc(r.titulo)}</h4>
             <p><span class="chip-cat">${cat.nombre}</span><span class="pts">+${r.pts}</span></p>
           </article>`;
@@ -298,7 +298,7 @@ const UI = (() => {
       <div class="hoja-fondo" data-cerrar></div>
       <div class="hoja" style="--cat:${cat.color}">
         <div class="agarre"></div>
-        <div class="hoja-img">${img(r.id, 'flota')}</div>
+        <div class="hoja-img">${img(r.img || r.id, 'flota')}</div>
         <span class="chip-cat">${cat.nombre}</span>
         <h3>${esc(r.titulo)}</h3>
         <p class="hoja-info">${esc(r.info)}</p>

@@ -49,6 +49,8 @@ const RETOS = [
     info: 'Ahorras energía y le das un descanso a tu mente. Menos pantalla suele significar mejor ánimo y mejor sueño.' },
   { id: 'escaleras', cat: 'energia',   pts: 5,  co2: 0.03, agua: 0,   plastico: 0,  titulo: 'Usa las escaleras en vez del ascensor',
     info: 'Ahorras la energía del ascensor y de paso haces ejercicio. Bueno para el planeta y para ti.' },
+  { id: 'wifi',      cat: 'energia',   pts: 5,  co2: 0.05, agua: 0,   plastico: 0,  img: 'luces', titulo: 'Apaga el Wi-Fi en la noche',
+    info: 'El router consume energía toda la noche aunque nadie lo use. Apagarlo antes de dormir es un hábito simple que ahorra energía.' },
   // Movilidad
   { id: 'caminar',   cat: 'movilidad', pts: 15, co2: 0.50, agua: 0,   plastico: 0,  titulo: 'Ve caminando a un lugar cercano',
     info: 'Los trayectos cortos en carro son los que más contaminan por kilómetro. Caminar no emite nada.' },
