@@ -116,3 +116,74 @@ const ANIMOS = [
 const AMIGOS_DEMO = ['Laura', 'Mateo', 'Sofía', 'Juan', 'Valentina'];
 
 const RETOS_POR_DIA = 5;
+
+// Imagen de un reto (puede tener una propia con `img`, si no usa su id)
+const retoImg = r => r.img || r.id;
+
+// ============================================================
+// RETO DE LA SEMANA — uno distinto cada semana, avanza solo
+// con los retos diarios que cumplas. tipo:
+//   'cat'   → cumplir `meta` retos de la categoría `cat`
+//   'dias'  → cumplir retos en `meta` días distintos
+//   'completos' → completar los 5 retos del día `meta` veces
+// ============================================================
+const RETOS_SEMANALES = [
+  { id: 'mov',     tipo: 'cat', cat: 'movilidad', meta: 4, pts: 60, img: 'bici',     titulo: 'Semana en movimiento',  desc: 'Cumple 4 retos de movilidad esta semana.' },
+  { id: 'agua',    tipo: 'cat', cat: 'agua',      meta: 5, pts: 60, img: 'droplet',  titulo: 'Guardián del agua',     desc: 'Cumple 5 retos de agua esta semana.' },
+  { id: 'plast',   tipo: 'cat', cat: 'plastico',  meta: 5, pts: 60, img: 'termo',    titulo: 'Semana cero plástico',  desc: 'Cumple 5 retos de plástico esta semana.' },
+  { id: 'ener',    tipo: 'cat', cat: 'energia',   meta: 5, pts: 50, img: 'voltage',  titulo: 'Ahorro de energía',     desc: 'Cumple 5 retos de energía esta semana.' },
+  { id: 'resid',   tipo: 'cat', cat: 'residuos',  meta: 4, pts: 60, img: 'reciclar', titulo: 'Rey del reciclaje',     desc: 'Cumple 4 retos de residuos esta semana.' },
+  { id: 'comida',  tipo: 'cat', cat: 'comida',    meta: 4, pts: 50, img: 'sinCarne', titulo: 'Comida consciente',     desc: 'Cumple 4 retos de comida esta semana.' },
+  { id: 'const',   tipo: 'dias', meta: 5,                   pts: 70, img: 'fire',     titulo: 'Constancia',            desc: 'Cumple al menos un reto en 5 días distintos.' },
+  { id: 'perfect', tipo: 'completos', meta: 2,              pts: 80, img: 'crown',    titulo: 'Doble día perfecto',    desc: 'Completa los 5 retos del día dos veces esta semana.' },
+];
+
+// ============================================================
+// LOGROS — se desbloquean solos. `cond` recibe un resumen (s)
+// calculado en logic.js. Para agregar uno, copia una línea.
+// ============================================================
+const LOGROS = [
+  { id: 'primero',   img: 'compost',    nombre: 'Primer paso',        desc: 'Cumple tu primer reto.',                 cond: s => s.retos >= 1 },
+  { id: 'racha3',    img: 'fire',       nombre: 'En llamas',          desc: 'Racha de 3 días.',                       cond: s => s.mejorRacha >= 3 },
+  { id: 'racha7',    img: 'cronometro', nombre: 'Semana imparable',   desc: 'Racha de 7 días.',                       cond: s => s.mejorRacha >= 7 },
+  { id: 'racha30',   img: 'gema',       nombre: 'Leyenda constante',  desc: 'Racha de 30 días.',                      cond: s => s.mejorRacha >= 30 },
+  { id: 'perfecto',  img: 'fiesta',     nombre: 'Día perfecto',       desc: 'Completa los 5 retos de un día.',        cond: s => s.diasCompletos >= 1 },
+  { id: 'retos25',   img: 'diana',      nombre: 'Enfocado',           desc: 'Cumple 25 retos.',                       cond: s => s.retos >= 25 },
+  { id: 'retos100',  img: 'cien',       nombre: 'Cien de cien',       desc: 'Cumple 100 retos.',                      cond: s => s.retos >= 100 },
+  { id: 'explorador',img: 'mapa',       nombre: 'Explorador',         desc: 'Cumple un reto de cada categoría.',      cond: s => s.categorias >= 7 },
+  { id: 'agua100',   img: 'droplet',    nombre: 'Gota a gota',        desc: 'Ahorra 100 litros de agua.',             cond: s => s.agua >= 100 },
+  { id: 'co2_10',    img: 'pino',       nombre: 'Pulmón verde',       desc: 'Evita 10 kg de CO₂.',                    cond: s => s.co2 >= 10 },
+  { id: 'plast500',  img: 'mariposa',   nombre: 'Mar limpio',         desc: 'Evita 500 g de plástico.',               cond: s => s.plastico >= 500 },
+  { id: 'animo7',    img: 'corazon',    nombre: 'Me conozco',         desc: 'Registra tu ánimo 7 días.',              cond: s => s.animos >= 7 },
+  { id: 'foto',      img: 'camara',     nombre: 'Fotógrafo verde',    desc: 'Sube tu primera foto de prueba.',        cond: s => s.fotos >= 1 },
+  { id: 'escudo',    img: 'shield',     nombre: 'Salvado',            desc: 'Un escudo protegió tu racha.',           cond: s => s.escudosUsados >= 1 },
+  { id: 'semanal',   img: 'trophy',     nombre: 'Campeón semanal',    desc: 'Completa un reto de la semana.',         cond: s => s.semanales >= 1 },
+  { id: 'nivel5',    img: 'reciclar',   nombre: 'Mitad del camino',   desc: 'Llega al nivel 5.',                      cond: s => s.nivel >= 5 },
+  { id: 'nivel10',   img: 'crown',      nombre: 'Planeta sanado',     desc: 'Llega al nivel 10.',                     cond: s => s.nivel >= 10 },
+];
+
+// ============================================================
+// ONBOARDING — 3 preguntas que personalizan los retos del día.
+// `pesos` suma prioridad a categorías (más peso = sale más).
+// ============================================================
+const PREGUNTAS = [
+  { id: 'mov', titulo: '¿Cómo te mueves normalmente?', img: 'bici', opciones: [
+    { v: 'carro',   txt: 'En carro o moto',             img: 'compartir', pesos: { movilidad: 3 } },
+    { v: 'publico', txt: 'En transporte público',        img: 'publico',   pesos: { movilidad: 1.5 } },
+    { v: 'activo',  txt: 'Caminando o en bici',          img: 'caminar',   pesos: { movilidad: 0.6 } },
+  ] },
+  { id: 'rec', titulo: '¿Separas la basura en tu casa?', img: 'reciclar', opciones: [
+    { v: 'siempre', txt: 'Sí, siempre',                  img: 'reciclar', pesos: { residuos: 0.7 } },
+    { v: 'aveces',  txt: 'A veces',                      img: 'separar',  pesos: { residuos: 1.6 } },
+    { v: 'nunca',   txt: 'Casi nunca',                   img: 'smog',     pesos: { residuos: 2.6 } },
+  ] },
+  { id: 'imp', titulo: '¿Qué es lo que más te importa?', img: 'globe', multiple: true, opciones: [
+    { v: 'agua',      txt: 'El agua',           img: 'droplet',   pesos: { agua: 2 } },
+    { v: 'plastico',  txt: 'El plástico',       img: 'termo',     pesos: { plastico: 2 } },
+    { v: 'energia',   txt: 'La energía',        img: 'voltage',   pesos: { energia: 2 } },
+    { v: 'comida',    txt: 'La comida',         img: 'sinCarne',  pesos: { comida: 2 } },
+    { v: 'bienestar', txt: 'Sentirme mejor',    img: 'aireLibre', pesos: { bienestar: 2.5 } },
+  ] },
+];
+
+const MAX_ESCUDOS = 3;

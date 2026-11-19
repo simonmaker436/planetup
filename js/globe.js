@@ -2,7 +2,8 @@
 // globe.js — La Tierra real girando (imágenes de la NASA)
 // Día, luces de ciudades de noche, nubes, atmósfera y estrellas.
 // La app le habla con: window.PlanetGlobe.setMode('inicio'),
-// setGlow(0..1), setScroll(px) y boost() (giro rápido al cumplir un reto).
+// setGlow(0..1), setHealth(0..1) (salud del planeta según tu nivel),
+// setScroll(px), boost() (giro rápido al cumplir un reto) y foto() (para la tarjeta).
 // ============================================================
 
 import * as THREE from '../vendor/three.min.js';
@@ -13,6 +14,7 @@ const canvas = document.getElementById('space');
 // cx, cy = posición (0 a 1 de la pantalla) · r = radio (fracción del ancho)
 const MODOS = {
   bienvenida: { cx: 0.5,  cy: 0.40, r: 0.44 },
+  onboarding: { cx: 0.5,  cy: 0.15, r: 0.22 },
   inicio:     { cx: 0.5,  cy: 0.335, r: 0.36 },
   retos:      { cx: 0.98, cy: 0.02, r: 0.30 },
   liga:       { cx: 0.5,  cy: 1.10, r: 0.75 },
@@ -96,6 +98,7 @@ function iniciar() {
     noche: { value: tex('img/earth/night.jpg') },
     sol: { value: SOL },
     brillo: { value: 0 },
+    salud: { value: 1 },
   };
   const tierra = new THREE.Mesh(
     new THREE.SphereGeometry(1, 128, 96),
@@ -103,13 +106,17 @@ function iniciar() {
       uniforms: uniTierra,
       vertexShader: vertComun,
       fragmentShader: `
-        uniform sampler2D dia; uniform sampler2D noche; uniform vec3 sol; uniform float brillo;
+        uniform sampler2D dia; uniform sampler2D noche; uniform vec3 sol; uniform float brillo; uniform float salud;
         varying vec2 vUv; varying vec3 vNormal; varying vec3 vView;
         void main() {
           vec3 n = normalize(vNormal);
           float d = dot(n, sol);
           float mezcla = smoothstep(-0.18, 0.28, d);
           vec3 cDia = texture2D(dia, vUv).rgb;
+          // Planeta enfermo: tierra seca y café, océanos turbios y una capa de smog
+          float gris = dot(cDia, vec3(0.299, 0.587, 0.114));
+          vec3 enfermo = mix(vec3(gris), vec3(gris) * vec3(1.08, 0.9, 0.66), 0.7) * 0.95;
+          cDia = mix(enfermo, cDia, smoothstep(0.0, 1.0, salud));
           vec3 cNoche = texture2D(noche, vUv).rgb * vec3(1.0, 0.82, 0.55) * 1.6;
           vec3 color = mix(cNoche, cDia * (0.22 + 1.0 * max(d, 0.0)), mezcla);
           float oceano = smoothstep(0.03, 0.18, cDia.b - cDia.r);
@@ -117,6 +124,7 @@ function iniciar() {
           color += pow(max(dot(r, vView), 0.0), 28.0) * oceano * 0.55 * mezcla * vec3(1.0, 0.95, 0.85);
           float fres = pow(1.0 - max(dot(n, vView), 0.0), 2.6);
           color += fres * mix(vec3(0.25, 0.55, 1.0), vec3(0.3, 1.0, 0.6), brillo) * (0.45 + brillo * 0.6) * (0.25 + mezcla);
+          color = mix(color, vec3(0.42, 0.38, 0.3) * (0.25 + max(d, 0.0)), (1.0 - salud) * 0.18);
           gl_FragColor = vec4(color, 1.0);
         }`,
     })
@@ -127,16 +135,16 @@ function iniciar() {
   const nubes = new THREE.Mesh(
     new THREE.SphereGeometry(1.012, 96, 64),
     new THREE.ShaderMaterial({
-      uniforms: { mapa: { value: tex('img/earth/clouds.jpg') }, sol: { value: SOL } },
+      uniforms: { mapa: { value: tex('img/earth/clouds.jpg') }, sol: { value: SOL }, salud: uniTierra.salud },
       vertexShader: vertComun,
       fragmentShader: `
-        uniform sampler2D mapa; uniform vec3 sol;
+        uniform sampler2D mapa; uniform vec3 sol; uniform float salud;
         varying vec2 vUv; varying vec3 vNormal; varying vec3 vView;
         void main() {
           float a = texture2D(mapa, vUv).r;
           float d = dot(normalize(vNormal), sol);
           float luz = 0.08 + 0.95 * smoothstep(-0.1, 0.6, d);
-          gl_FragColor = vec4(vec3(luz), a * 0.85);
+          gl_FragColor = vec4(vec3(luz) * mix(vec3(0.72, 0.66, 0.56), vec3(1.0), salud), a * mix(1.0, 0.85, salud));
         }`,
       transparent: true,
       depthWrite: false,
@@ -145,19 +153,19 @@ function iniciar() {
   giro.add(nubes);
 
   // ---------- Atmósfera (resplandor) ----------
-  const uniAtm = { brillo: { value: 0 } };
+  const uniAtm = { brillo: uniTierra.brillo, salud: uniTierra.salud };
   const atmosfera = new THREE.Mesh(
     new THREE.SphereGeometry(1.16, 64, 48),
     new THREE.ShaderMaterial({
       uniforms: uniAtm,
       vertexShader: `varying vec3 vN;
         void main() { vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform float brillo; varying vec3 vN;
+      fragmentShader: `uniform float brillo; uniform float salud; varying vec3 vN;
         void main() {
           // 0 en el borde exterior, 1 pegado a la Tierra: un halo que se desvanece
           float t = clamp(-vN.z / 0.5, 0.0, 1.0);
           float i = pow(t, 3.0);
-          vec3 c = mix(vec3(0.3, 0.62, 1.0), vec3(0.3, 1.0, 0.62), brillo);
+          vec3 c = mix(mix(vec3(0.62, 0.52, 0.38), vec3(0.3, 0.62, 1.0), salud), vec3(0.3, 1.0, 0.62), brillo * salud);
           gl_FragColor = vec4(c * i * (0.9 + brillo * 1.2), 1.0);
         }`,
       side: THREE.BackSide,
@@ -170,7 +178,7 @@ function iniciar() {
 
   // ---------- Estado animado ----------
   let modo = window.__globeMode || 'bienvenida';
-  let scroll = 0, brilloObjetivo = 0, impulso = 0;
+  let scroll = 0, brilloObjetivo = 0, impulso = 0, saludObjetivo = 1;
   const actual = { x: 0, y: 0, s: 1 };
   let primeraVez = true;
 
@@ -217,7 +225,8 @@ function iniciar() {
     uniE.tiempo.value += dt;
 
     const b = uniTierra.brillo.value + (brilloObjetivo - uniTierra.brillo.value) * k * 0.6;
-    uniTierra.brillo.value = b; uniAtm.brillo.value = b;
+    uniTierra.brillo.value = b;
+    uniTierra.salud.value += (saludObjetivo - uniTierra.salud.value) * Math.min(1, dt * 1.2); // se sana despacio
 
     renderer.render(escena, camara);
   }
@@ -228,6 +237,23 @@ function iniciar() {
     setScroll(y) { scroll = y; },
     setGlow(v) { brilloObjetivo = Math.max(0, Math.min(1, v)); },
     boost() { impulso = 1; },
+    setHealth(v) { saludObjetivo = Math.max(0, Math.min(1, v)); },
+    // Foto del planeta para la tarjeta: devuelve un canvas cuadrado con la Tierra recortada
+    foto(tam = 900) {
+      renderer.render(escena, camara);
+      const c = document.createElement('canvas'); c.width = c.height = tam;
+      const vw = window.innerWidth, vh = window.innerHeight, px = renderer.domElement.width / vw;
+      const H = 2 * Math.tan((camara.fov / 2) * Math.PI / 180) * camara.position.z;
+      const sx = (actual.x / (H * vw / vh) + 0.5) * vw, sy = (0.5 - actual.y / H) * vh, r = (actual.s / H) * vh * 1.22;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(renderer.domElement, (sx - r) * px, (sy - r) * px, 2 * r * px, 2 * r * px, 0, 0, tam, tam);
+      // borde suave: deja solo el planeta y su resplandor
+      ctx.globalCompositeOperation = 'destination-in';
+      const g = ctx.createRadialGradient(tam / 2, tam / 2, tam * 0.36, tam / 2, tam / 2, tam / 2);
+      g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, tam, tam);
+      return c;
+    },
   };
   window.dispatchEvent(new Event('globe-ready'));
 }

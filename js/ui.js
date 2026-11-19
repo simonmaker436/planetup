@@ -20,6 +20,11 @@ const UI = (() => {
     check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     chispa: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+    camara: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
+    compartir: '<path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>',
+    campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>',
+    escudo: '<path d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6z"/>',
+    cerrar: '<path d="M6 6l12 12M18 6 6 18"/>',
   };
   const icono = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONOS[n]}</svg>`;
 
@@ -49,7 +54,7 @@ const UI = (() => {
     const cat = CATEGORIAS[r.cat];
     return `
       <article class="reto ${hecho ? 'hecho' : ''}" data-abrir="${r.id}" style="--cat:${cat.color};--i:${i}">
-        <div class="reto-img">${img(r.img || r.id)}</div>
+        <div class="reto-img">${img(retoImg(r))}</div>
         <div class="reto-info">
           <h4>${esc(r.titulo)}</h4>
           <p><span class="chip-cat">${cat.nombre}</span><span class="pts">+${r.pts} pts</span></p>
@@ -80,13 +85,54 @@ const UI = (() => {
       </section>`;
   }
 
+  const colorSalud = v => v < 34 ? '#E0A35A' : v < 67 ? '#C9E05A' : '#3DDC84';
+
+  // Aviso del recordatorio dentro de la app (si ya pasó tu hora y faltan retos)
+  function aviso(state, faltan) {
+    if (!state.recordatorio || faltan <= 0) return '';
+    const [h, m] = state.recordatorio.split(':').map(Number), ahora = new Date();
+    if (ahora.getHours() * 60 + ahora.getMinutes() < h * 60 + m) return '';
+    return `<div class="aviso entra">${img('alarma', 'flota')}<p><b>Es tu hora de retos</b><br>Te ${faltan === 1 ? 'falta 1 reto' : `faltan ${faltan} retos`} para completar el día.</p></div>`;
+  }
+
+  // ---------------- ONBOARDING (3 preguntas) ----------------
+  function onboarding(paso, respuestas, nombre) {
+    if (paso >= PREGUNTAS.length) {
+      return `<section class="onb onb-fin">
+        <div class="onb-espacio"></div>
+        <div class="onb-contenido">
+          ${img('sparkles', 'onb-img flota')}
+          <h2>Listo, ${esc(nombre)}</h2>
+          <p class="lema">Armamos tus retos según cómo vives. Tu planeta empieza un poco gris: cada nivel que subas lo va a ir sanando.</p>
+          <button class="btn-primario" data-onb="fin">Ver mis retos ${icono('flecha')}</button>
+        </div></section>`;
+    }
+    const p = PREGUNTAS[paso], elegidas = [].concat(respuestas[p.id] || []);
+    return `<section class="onb">
+      <div class="onb-puntos">${PREGUNTAS.map((_, i) => `<i class="${i <= paso ? 'on' : ''}"></i>`).join('')}</div>
+      <div class="onb-contenido" style="--k:${paso}">
+        ${img(p.img, 'onb-img flota')}
+        <p class="kicker">Pregunta ${paso + 1} de ${PREGUNTAS.length}</p>
+        <h2>${p.titulo}</h2>
+        ${p.multiple ? '<p class="sub">Puedes elegir varias.</p>' : ''}
+        <div class="opciones ${p.multiple ? 'multi' : ''}">
+          ${p.opciones.map((o, i) => `<button class="opcion ${elegidas.includes(o.v) ? 'sel' : ''}" data-opcion="${o.v}" style="--i:${i}">${img(o.img)}<span>${o.txt}</span><i>${icono('check')}</i></button>`).join('')}
+        </div>
+        ${p.multiple ? `<button class="btn-primario" data-onb="siguiente" ${elegidas.length ? '' : 'disabled'}>Continuar ${icono('flecha')}</button>` : ''}
+        <button class="btn-peligro saltar" data-onb="saltar">Saltar por ahora</button>
+      </div></section>`;
+  }
+
   // ---------------- INICIO ----------------
   function inicio(state) {
     const pts = Logic.puntosTotales(state);
     const nv = Logic.nivelActual(pts);
     const racha = Logic.racha(state);
+    const escudos = Logic.escudos(state);
+    const salud = Math.round(Logic.saludPlaneta(state) * 100);
+    const sem = Logic.semanal(state);
     const hoy = Logic.hechosHoy(state);
-    const delDia = Logic.retosDelDia();
+    const delDia = Logic.retosDelDia(state);
     const hechosDelDia = delDia.filter(r => hoy.includes(r.id)).length;
     const animoHoy = state.animo[Logic.claveFecha()];
     const sug = Logic.sugerencia(state);
@@ -98,11 +144,18 @@ const UI = (() => {
           <p class="fecha">${fecha}</p>
           <h2>Hola, ${esc(state.nombre)}</h2>
         </div>
-        <div class="racha ${racha ? 'activa' : ''}">${img('fire')}<b data-contar="${racha}">${racha}</b></div>
+        <div class="chips-top">
+          ${escudos ? `<div class="escudos" data-accion="info-escudo">${img('shield')}<b>${escudos}</b></div>` : ''}
+          <div class="racha ${racha ? 'activa' : ''}">${img('fire')}<b data-contar="${racha}">${racha}</b></div>
+        </div>
       </header>
+      ${aviso(state, delDia.length - hechosDelDia)}
 
       <div class="espacio-planeta">
-        <p class="pista"><span class="punto"></span>${hechosDelDia === 0 ? 'Cumple retos y tu planeta brillará' : hechosDelDia === delDia.length ? 'Tu planeta brilla al máximo hoy' : 'Tu planeta brilla más con cada reto'}</p>
+        <div class="salud" data-tab="progreso">
+          <span class="salud-txt"><span class="punto" style="--sc:${colorSalud(salud)}"></span>Salud del planeta <b>${salud}%</b></span>
+          <span class="salud-barra"><i style="--p:${Math.max(4, salud)}%;--sc:${colorSalud(salud)}"></i></span>
+        </div>
       </div>
 
       <section class="card nivel-card entra" data-tab="progreso" style="--i:0">
@@ -117,30 +170,45 @@ const UI = (() => {
 
       <section class="card semana entra" style="--i:1">
         ${Logic.semana(state).map(d => `
-          <div class="dia ${d.retos ? 'lleno' : ''} ${d.hoy ? 'hoy' : ''} ${d.futuro ? 'futuro' : ''}">
+          <div class="dia ${d.retos ? 'lleno' : ''} ${d.completo ? 'completo-dia' : ''} ${d.escudo ? 'protegido' : ''} ${d.hoy ? 'hoy' : ''} ${d.futuro ? 'futuro' : ''}">
             <span>${DIAS[(d.d.getDay() + 6) % 7]}</span>
-            <i>${d.retos ? icono('check') : d.d.getDate()}</i>
+            <i>${d.escudo ? img('shield') : d.retos ? icono('check') : d.d.getDate()}</i>
           </div>`).join('')}
       </section>
 
-      <section class="card entra" style="--i:2">
+      <section class="card semanal entra ${sem.completo ? 'ganado' : ''}" style="--i:2">
+        <div class="semanal-top">
+          <div class="semanal-img">${img(sem.reto.img, 'flota')}</div>
+          <div>
+            <p class="kicker">Reto de la semana · ${sem.completo ? 'completado' : `quedan ${plural(sem.diasRestantes, 'día', 'días')}`}</p>
+            <h3>${sem.reto.titulo}</h3>
+            <p class="mini">${sem.reto.desc}</p>
+          </div>
+        </div>
+        <div class="semanal-prog">
+          <div class="barra"><div class="barra-relleno" style="--p:${Math.max(3, sem.progreso / sem.reto.meta * 100)}%"></div></div>
+          <b>${sem.progreso}/${sem.reto.meta}</b><span class="pill">+${sem.reto.pts} pts</span>
+        </div>
+      </section>
+
+      <section class="card entra" style="--i:3">
         <h3>¿Cómo te sientes hoy?</h3>
         <div class="animos">
           ${ANIMOS.map(a => `<button class="animo ${animoHoy === a.v ? 'sel' : ''}" data-animo="${a.v}">${cara(a.v, a.color)}<span>${a.nombre}</span></button>`).join('')}
         </div>
       </section>
 
-      <section class="entra" style="--i:3">
+      <section class="entra" style="--i:4">
         <div class="titulo-seccion">
-          <div><h3>Retos de hoy</h3><p class="mini">Cambian cada día a medianoche</p></div>
+          <div><h3>Retos de hoy</h3><p class="mini">${state.perfil ? 'Elegidos para ti · cambian a medianoche' : 'Cambian cada día a medianoche'}</p></div>
           ${anillo(hechosDelDia, delDia.length)}
         </div>
         <div class="lista">${delDia.map((r, i) => tarjetaReto(r, hoy.includes(r.id), i)).join('')}</div>
-        ${hechosDelDia === delDia.length ? `<div class="completo">${img('sparkles')}<p><b>¡Día completo!</b><br>Cumpliste todos los retos de hoy.</p></div>` : ''}
+        ${hechosDelDia === delDia.length ? `<div class="completo">${img('sparkles')}<p><b>¡Día completo!</b><br>Ganaste un escudo que protege tu racha si un día se te olvida.</p></div>` : `<p class="mini centro">Completa los 5 y ganas un ${img('shield', 'inline')} escudo para tu racha</p>`}
       </section>
 
       ${sug ? `
-      <section class="card sugerencia entra" style="--i:4">
+      <section class="card sugerencia entra" style="--i:5">
         <div class="sug-top">${img('sparkles')}<div><h3>Sugerencia para ti</h3><p class="mini">${sug.motivo}</p></div></div>
         <div class="lista">${tarjetaReto(sug.reto, false)}</div>
       </section>` : ''}
@@ -166,7 +234,7 @@ const UI = (() => {
           const hecho = hoy.includes(r.id), cat = CATEGORIAS[r.cat];
           return `<article class="tile ${hecho ? 'hecho' : ''}" data-abrir="${r.id}" style="--cat:${cat.color};--i:${i}">
             <button class="check" data-reto="${r.id}" aria-label="Marcar reto">${icono('check')}</button>
-            <div class="tile-img">${img(r.img || r.id)}</div>
+            <div class="tile-img">${img(retoImg(r))}</div>
             <h4>${esc(r.titulo)}</h4>
             <p><span class="chip-cat">${cat.nombre}</span><span class="pts">+${r.pts}</span></p>
           </article>`;
@@ -226,9 +294,12 @@ const UI = (() => {
     const animoDe = v => ANIMOS.find(a => a.v === Math.round(v));
 
     return `
-      <header class="encabezado">
-        <p class="kicker">${plural(imp.retos, 'reto cumplido', 'retos cumplidos')}</p>
-        <h2 class="titulo-pagina">Tu impacto</h2>
+      <header class="encabezado fila-encabezado">
+        <div>
+          <p class="kicker">${plural(imp.retos, 'reto cumplido', 'retos cumplidos')}</p>
+          <h2 class="titulo-pagina">Tu impacto</h2>
+        </div>
+        <button class="btn-icono" data-accion="compartir" aria-label="Compartir">${icono('compartir')}</button>
       </header>
 
       <section class="impacto-hero card">
@@ -279,14 +350,43 @@ const UI = (() => {
         </div>
       </section>
 
+      <section>
+        <div class="titulo-seccion"><h3>Logros</h3><span class="mini">${Object.keys(state.logros || {}).length} de ${LOGROS.length}</span></div>
+        <div class="logros">
+          ${LOGROS.map((l, i) => {
+            const ok = state.logros && state.logros[l.id];
+            return `<button class="logro ${ok ? 'ganado' : ''}" data-logro="${l.id}" style="--i:${i}">${img(l.img)}<b>${l.nombre}</b></button>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <section>
+        <div class="titulo-seccion"><h3>Fotos de tus retos</h3><span class="mini">${plural((state.fotos || []).length, 'foto', 'fotos')}</span></div>
+        ${(state.fotos || []).length ? `<div class="galeria">
+          ${[...state.fotos].reverse().map(k => {
+            const [f, id] = k.split('|'), r = Logic.retoPorId[id];
+            return `<figure data-ver-foto="${k}"><img data-foto="${k}" alt=""><figcaption>${r ? esc(r.titulo) : ''}<span>${new Date(f + 'T12:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</span></figcaption></figure>`;
+          }).join('')}
+        </div>` : `<div class="vacio-card">${img('camara')}<p class="sub">Cuando cumplas un reto, ábrelo y toca <b>Agregar foto de prueba</b>. Aquí se arma tu galería.</p></div>`}
+      </section>
+
+      <section class="card fila-ajuste" data-accion="recordatorio">
+        ${img('alarma')}
+        <div><h3>Recordatorio diario</h3><p class="mini">${state.recordatorio ? `Todos los días a las ${hora12(state.recordatorio)}` : 'Elige una hora para acordarte de tus retos'}</p></div>
+        ${icono('flecha')}
+      </section>
+
       <section class="ajustes">
+        <button class="btn-secundario" data-accion="perfil">Volver a personalizar mis retos</button>
         <button class="btn-secundario" data-accion="nombre">Cambiar nombre</button>
         <button class="btn-peligro" data-accion="reset">Borrar mis datos</button>
       </section>`;
   }
 
+  const hora12 = h => { const [a, b] = h.split(':').map(Number); return `${(a % 12) || 12}:${String(b).padStart(2, '0')} ${a < 12 ? 'a. m.' : 'p. m.'}`; };
+
   // ---------------- HOJA DE DETALLE DEL RETO ----------------
-  function hoja(r, hecho) {
+  function hoja(r, hecho, claveFoto) {
     const cat = CATEGORIAS[r.cat];
     const chips = [
       r.co2 ? `<span><b>${fmt(r.co2, 2)} kg</b>CO₂</span>` : '',
@@ -298,11 +398,16 @@ const UI = (() => {
       <div class="hoja-fondo" data-cerrar></div>
       <div class="hoja" style="--cat:${cat.color}">
         <div class="agarre"></div>
-        <div class="hoja-img">${img(r.img || r.id, 'flota')}</div>
+        <div class="hoja-img">${img(retoImg(r), 'flota')}</div>
         <span class="chip-cat">${cat.nombre}</span>
         <h3>${esc(r.titulo)}</h3>
         <p class="hoja-info">${esc(r.info)}</p>
         <div class="impacto-chips">${chips}</div>
+        ${claveFoto ? `<div class="foto-prueba"><img data-foto="${claveFoto}" alt=""><span>${icono('check')} Foto de prueba</span></div>` : ''}
+        <label class="btn-secundario btn-foto">
+          ${icono('camara')} ${claveFoto ? 'Cambiar foto' : hecho ? 'Agregar foto de prueba' : 'Lo hice con foto'}
+          <input type="file" accept="image/*" capture="environment" data-subir-foto="${r.id}" hidden>
+        </label>
         <button class="btn-primario ${hecho ? 'listo' : ''}" data-reto="${r.id}" data-desde-hoja>
           ${hecho ? `${icono('check')} Hecho hoy · tocar para desmarcar` : `¡Lo hice! ${icono('check')}`}
         </button>
@@ -322,5 +427,82 @@ const UI = (() => {
       </div>`;
   }
 
-  return { bienvenida, inicio, retos, liga, progreso, hoja, subioNivel, icono };
+  // ---------------- LOGRO DESBLOQUEADO ----------------
+  function logroNuevo(l) {
+    return `
+      <div class="celebra">
+        <div class="rayos dorados"></div>
+        ${img(l.img, 'celebra-img')}
+        <p class="kicker">¡Logro desbloqueado!</p>
+        <h2 class="logro-nombre">${l.nombre}</h2>
+        <h3>${l.desc}</h3>
+        <button class="btn-primario" data-cerrar>Genial ${icono('flecha')}</button>
+      </div>`;
+  }
+
+  // Detalle de un logro (bloqueado o no)
+  function logroInfo(l, fecha) {
+    return `
+      <div class="hoja-fondo" data-cerrar></div>
+      <div class="hoja" style="--cat:${fecha ? '#FFC845' : '#6B7A71'}">
+        <div class="agarre"></div>
+        <div class="hoja-img ${fecha ? '' : 'bloqueada'}">${img(l.img, 'flota')}</div>
+        <span class="chip-cat">${fecha ? `Desbloqueado el ${new Date(fecha + 'T12:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}` : 'Bloqueado'}</span>
+        <h3>${l.nombre}</h3>
+        <p class="hoja-info">${l.desc}</p>
+        <button class="btn-secundario ancho" data-cerrar>Cerrar</button>
+      </div>`;
+  }
+
+  function infoEscudo(n) {
+    return `
+      <div class="hoja-fondo" data-cerrar></div>
+      <div class="hoja" style="--cat:#5AB8FF">
+        <div class="agarre"></div>
+        <div class="hoja-img">${img('shield', 'flota')}</div>
+        <span class="chip-cat">Tienes ${plural(n, 'escudo', 'escudos')} · máximo ${MAX_ESCUDOS}</span>
+        <h3>Escudo de racha</h3>
+        <p class="hoja-info">Cada vez que completas los 5 retos del día ganas un escudo. Si un día se te olvida, el escudo se usa solo y tu racha no se pierde.</p>
+        <button class="btn-secundario ancho" data-cerrar>Entendido</button>
+      </div>`;
+  }
+
+  // Elegir la hora del recordatorio
+  function recordatorio(hora) {
+    return `
+      <div class="hoja-fondo" data-cerrar></div>
+      <div class="hoja" style="--cat:#FFC845">
+        <div class="agarre"></div>
+        <div class="hoja-img">${img('alarma', 'flota')}</div>
+        <h3>Recordatorio diario</h3>
+        <p class="hoja-info">Elige la hora. Se agrega como evento diario con alarma en el calendario de tu celular, y la app también te avisa al abrirla.</p>
+        <input type="time" id="hora-recordatorio" class="input-hora" value="${hora || '19:00'}">
+        <button class="btn-primario" data-accion="guardar-recordatorio">${icono('campana')} Agregar a mi calendario</button>
+        ${hora ? '<button class="btn-peligro" data-accion="quitar-recordatorio">Quitar recordatorio</button>' : ''}
+      </div>`;
+  }
+
+  // Vista de la tarjeta para compartir
+  function compartir(url, puedeCompartir) {
+    return `
+      <div class="compartir">
+        <button class="btn-icono cerrar" data-cerrar aria-label="Cerrar">${icono('cerrar')}</button>
+        <img src="${url}" class="tarjeta-img" alt="Mi progreso en PlanetUp">
+        ${puedeCompartir
+          ? `<button class="btn-primario" data-accion="compartir-ya">${icono('compartir')} Compartir</button>`
+          : `<p class="mini centro">Mantén presionada la imagen para guardarla o compartirla.</p>`}
+      </div>`;
+  }
+
+  function verFoto(clave, r) {
+    return `
+      <div class="compartir">
+        <button class="btn-icono cerrar" data-cerrar aria-label="Cerrar">${icono('cerrar')}</button>
+        <img data-foto="${clave}" class="tarjeta-img foto-grande" alt="">
+        <p class="sub centro">${r ? esc(r.titulo) : ''}</p>
+        <button class="btn-peligro" data-borrar-foto="${clave}">Borrar foto</button>
+      </div>`;
+  }
+
+  return { bienvenida, onboarding, inicio, retos, liga, progreso, hoja, subioNivel, logroNuevo, logroInfo, infoEscudo, recordatorio, compartir, verFoto, icono };
 })();

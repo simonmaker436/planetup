@@ -1,0 +1,21 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//PlanetUp//Recordatorio//ES
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:planetup-recordatorio-1745@planetup.vercel.app
+DTSTAMP:20261119T000000Z
+DTSTART:20261120T174500
+DURATION:PT10M
+RRULE:FREQ=DAILY
+SUMMARY:PlanetUp · Tus retos de hoy
+DESCRIPTION:Cumple tus retos ecológicos y mantén tu racha. https://planetup.vercel.app
+URL:https://planetup.vercel.app
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Tus retos de PlanetUp te esperan
+TRIGGER:PT0M
+END:VALARM
+END:VEVENT
+END:VCALENDAR
