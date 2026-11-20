@@ -502,3 +502,98 @@ img.inline { display: inline-block; width: 18px; height: 18px; vertical-align: -
 .opciones.multi .opcion i { position: absolute; top: 12px; right: 12px; }
 .opciones.multi .opcion:last-child { grid-column: span 2; flex-direction: row; align-items: center; }
 .opciones.multi .opcion:last-child i { position: static; }
+
+/* ── Liga real / panel social ─────────────────────────── */
+.social-banner {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 16px 18px; border-radius: var(--radio);
+  background: var(--card); border: 1px solid var(--borde);
+  text-align: left; cursor: pointer;
+  transition: background .18s;
+}
+.social-banner:active { background: var(--card-fuerte); }
+.social-banner .ico-banner { width: 40px; height: 40px; flex-shrink: 0; }
+.social-banner > div { flex: 1; }
+.social-banner > div b { display: block; margin-bottom: 2px; }
+.social-banner > div .mini { color: var(--gris); }
+
+.social-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.social-btn {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 15px 16px; border-radius: var(--radio);
+  background: var(--card); border: 1px solid var(--borde);
+  text-align: left; cursor: pointer; font-weight: 600;
+  transition: background .18s;
+}
+.social-btn:active { background: var(--card-fuerte); }
+.social-btn .ico-mini { width: 22px; height: 22px; flex-shrink: 0; }
+.social-btn > span { flex: 1; font-size: .9rem; }
+.social-btn.apagado { color: var(--gris); font-weight: 400; }
+
+.liga-cargando { padding: 32px 0; text-align: center; color: var(--gris); }
+.liga-vacia { padding: 28px 16px; text-align: center; color: var(--gris); line-height: 1.6; border-radius: var(--radio); background: var(--card); }
+
+/* ── Auth / Amigos / Curso (formularios en hoja) ─────── */
+.auth-tabs {
+  display: flex; gap: 4px;
+  background: rgba(255, 255, 255, .06); border-radius: 14px; padding: 4px;
+  margin-bottom: 14px;
+}
+.auth-tabs button {
+  flex: 1; padding: 8px 4px; border-radius: 10px;
+  font-size: .85rem; font-weight: 600; color: var(--gris);
+  transition: all .18s;
+}
+.auth-tabs button.sel { background: var(--card-fuerte); color: var(--texto); }
+
+.input-campo {
+  width: 100%; padding: 13px 14px; margin-bottom: 10px;
+  background: rgba(255, 255, 255, .06); border: 1.5px solid var(--borde);
+  border-radius: 14px; font-size: .9rem; color: var(--texto);
+  outline: none; -webkit-appearance: none; appearance: none;
+  display: block;
+}
+.input-campo:focus { border-color: rgba(61, 220, 132, .5); }
+.input-campo::placeholder { color: rgba(226, 238, 232, .35); }
+
+.auth-error {
+  color: var(--rojo); font-size: .82rem; padding: 2px 0 8px; display: block;
+}
+
+.btn-primario.ancho, .btn-secundario.ancho { width: 100%; justify-content: center; }
+
+.mi-codigo {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 20px 16px; margin-bottom: 16px;
+  background: rgba(61, 220, 132, .07); border-radius: var(--radio);
+  border: 1px dashed rgba(61, 220, 132, .3);
+}
+.codigo-grande {
+  font-size: 2.4rem; font-weight: 800; letter-spacing: .2em;
+  color: var(--verde); cursor: pointer; user-select: all;
+  transition: opacity .15s;
+}
+.codigo-grande:active { opacity: .6; }
+
+.mis-cursos { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.fila-curso {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 13px 15px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--borde);
+  text-align: left; cursor: pointer;
+  transition: background .18s;
+}
+.fila-curso:active { background: var(--card-fuerte); }
+.fila-curso > div { flex: 1; }
+.fila-curso b { display: block; font-size: .9rem; }
+.fila-curso .mini { color: var(--gris); margin-top: 2px; }
+
+.impacto-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 16px;
+}
+.impacto-chips span {
+  padding: 6px 12px; border-radius: 99px;
+  background: var(--card); border: 1px solid var(--borde);
+  font-size: .78rem; color: var(--gris);
+}
+.impacto-chips span b { color: var(--verde); margin-right: 4px; }

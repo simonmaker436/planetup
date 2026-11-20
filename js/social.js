@@ -64,15 +64,36 @@ const Social = (() => {
 
   // ── Liga ─────────────────────────────────────────────────
 
-  // Sube los puntos de la semana actual; también sincroniza el nombre.
+  // Sube puntos e impacto de la semana en paralelo; también sincroniza el nombre.
   // Llamar cada vez que el usuario marca un reto (si está logueado).
   async function sincronizarPuntos(state) {
     if (!Auth.loggedIn()) return;
     const semana = lunesToISO();
-    const puntos = puntosEnRango(state, semana, domingoISO(semana));
-    await Supa
-      .from('puntos_semana')
-      .upsert({ user_id: Auth.uid(), semana, puntos }, { onConflict: 'user_id,semana' });
+    const hasta  = domingoISO(semana);
+    const puntos = puntosEnRango(state, semana, hasta);
+
+    let co2 = 0, agua = 0, plastico = 0, retos = 0;
+    for (const [k, ids] of Object.entries(state.completados)) {
+      if (k < semana || k > hasta) continue;
+      for (const id of ids) {
+        const r = Logic.retoPorId[id];
+        if (!r) continue;
+        co2      += r.co2      || 0;
+        agua     += r.agua     || 0;
+        plastico += r.plastico || 0;
+        retos++;
+      }
+    }
+
+    await Promise.all([
+      Supa.from('puntos_semana')
+        .upsert({ user_id: Auth.uid(), semana, puntos },
+                 { onConflict: 'user_id,semana' }),
+      Supa.from('impacto_semana')
+        .upsert({ user_id: Auth.uid(), semana, co2, agua, plastico, retos },
+                 { onConflict: 'user_id,semana' }),
+    ]);
+
     if (state.nombre) sincronizarNombre(state.nombre);
   }
 
@@ -159,31 +180,6 @@ const Social = (() => {
     return { comoProfe: comoProfe || [], comoAlumno };
   }
 
-  // Sube el impacto de la semana (CO2, agua, plástico, retos)
-  async function sincronizarImpacto(state) {
-    if (!Auth.loggedIn()) return;
-    const semana = lunesToISO();
-    const hasta  = domingoISO(semana);
-    let co2 = 0, agua = 0, plastico = 0, retos = 0;
-    for (const [k, ids] of Object.entries(state.completados)) {
-      if (k < semana || k > hasta) continue;
-      for (const id of ids) {
-        const r = Logic.retoPorId[id];
-        if (!r) continue;
-        co2      += r.co2      || 0;
-        agua     += r.agua     || 0;
-        plastico += r.plastico || 0;
-        retos++;
-      }
-    }
-    await Supa
-      .from('impacto_semana')
-      .upsert(
-        { user_id: Auth.uid(), semana, co2, agua, plastico, retos },
-        { onConflict: 'user_id,semana' }
-      );
-  }
-
   // Vista del profe: impacto de todos los alumnos del curso esta semana.
   // Devuelve { filas: [...], total: { co2, agua, plastico, retos } }
   async function obtenerImpactoCurso(cursoId) {
@@ -240,6 +236,6 @@ const Social = (() => {
     obtenerPerfil, sincronizarNombre,
     sincronizarPuntos, obtenerLiga, agregarAmigo,
     crearCurso, unirseACurso, obtenerMisCursos,
-    sincronizarImpacto, obtenerImpactoCurso,
+    obtenerImpactoCurso,
   };
 })();

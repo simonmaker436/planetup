@@ -243,12 +243,61 @@ const UI = (() => {
   }
 
   // ---------------- LIGA ----------------
-  function liga(state) {
-    const filas = Logic.liga(state);
-    const podio = [filas[1], filas[0], filas[2]];
-    const alturas = [0.72, 1, 0.55], medallas = ['medal2', 'medal1', 'medal3'];
-    const miPos = filas.findIndex(f => f.yo) + 1;
+  // ligaReal === undefined → demo (sin cuenta)
+  // ligaReal === null      → logueado, esperando datos
+  // ligaReal es array      → datos reales
+  function liga(state, ligaReal) {
+    const usaReal = ligaReal !== undefined;
     const avatar = (f, cls = '') => `<span class="avatar ${cls}" style="--h:${(f.nombre.charCodeAt(0) * 37) % 360}">${esc(f.nombre[0] || '?').toUpperCase()}</span>`;
+
+    if (ligaReal === null) {
+      return `
+        <header class="encabezado liga-top">
+          <div>
+            <p class="kicker">${icono('reloj')} Termina en ${Logic.finDeLiga()}</p>
+            <h2 class="titulo-pagina">Liga semanal</h2>
+          </div>
+          ${img('trophy', 'trofeo flota')}
+        </header>
+        <div class="liga-cargando"><p class="mini">Cargando tu liga...</p></div>
+        ${_socialPanel(true)}`;
+    }
+
+    const filas = usaReal ? (ligaReal || []) : Logic.liga(state);
+    const miPos = filas.findIndex(f => f.yo) + 1 || 1;
+
+    let podioHTML = '';
+    if (filas.length >= 3) {
+      const podio = [filas[1], filas[0], filas[2]];
+      const alturas = [0.72, 1, 0.55], medallas = ['medal2', 'medal1', 'medal3'];
+      podioHTML = `<section class="podio">
+        ${podio.map((f, i) => `
+          <div class="podio-col ${f.yo ? 'yo' : ''}" style="--h:${alturas[i]};--i:${i}">
+            ${img(medallas[i], 'medalla')}
+            ${avatar(f, 'grande')}
+            <b>${esc(f.nombre)}</b>
+            <span class="pts-podio">${fmt(f.pts)} pts</span>
+            <div class="podio-barra"><span>${[2, 1, 3][i]}</span></div>
+          </div>`).join('')}
+      </section>`;
+    }
+
+    const listaFilas = filas.length >= 3 ? filas.slice(3) : filas;
+    let listaHTML = '';
+    if (listaFilas.length > 0) {
+      listaHTML = `<div class="liga">
+        ${listaFilas.map((f, i) => `
+          <div class="fila-liga ${f.yo ? 'yo' : ''}" style="--i:${i}">
+            <span class="pos">${filas.length >= 3 ? i + 4 : i + 1}</span>
+            ${avatar(f)}
+            <span class="nombre">${esc(f.nombre)}${f.yo ? ' (tú)' : ''}</span>
+            <span class="pts">${fmt(f.pts)} pts</span>
+          </div>`).join('')}
+      </div>`;
+    } else if (usaReal) {
+      listaHTML = `<div class="liga-vacia"><p>Agrega amigos con tu código para ver la liga real.</p></div>`;
+    }
+
     return `
       <header class="encabezado liga-top">
         <div>
@@ -258,28 +307,36 @@ const UI = (() => {
         </div>
         ${img('trophy', 'trofeo flota')}
       </header>
+      ${podioHTML}
+      ${listaHTML}
+      ${!usaReal ? '<p class="nota">Amigos de demostración · conéctate para la liga real.</p>' : ''}
+      ${_socialPanel(usaReal)}`;
+  }
 
-      <section class="podio">
-        ${podio.map((f, i) => `
-          <div class="podio-col ${f.yo ? 'yo' : ''}" style="--h:${alturas[i]};--i:${i}">
-            ${img(medallas[i], 'medalla')}
-            ${avatar(f, 'grande')}
-            <b>${esc(f.nombre)}</b>
-            <span class="pts-podio">${fmt(f.pts)} pts</span>
-            <div class="podio-barra"><span>${[2, 1, 3][i]}</span></div>
-          </div>`).join('')}
-      </section>
-
-      <div class="liga">
-        ${filas.slice(3).map((f, i) => `
-          <div class="fila-liga ${f.yo ? 'yo' : ''}" style="--i:${i}">
-            <span class="pos">${i + 4}</span>
-            ${avatar(f)}
-            <span class="nombre">${esc(f.nombre)}${f.yo ? ' (tú)' : ''}</span>
-            <span class="pts">${fmt(f.pts)} pts</span>
-          </div>`).join('')}
-      </div>
-      <p class="nota">Versión de prueba: los amigos son de demostración. En la versión final se conectarían amigos y cursos reales.</p>`;
+  function _socialPanel(logueado) {
+    if (logueado) {
+      return `
+        <div class="social-panel">
+          <button class="social-btn" data-accion="abrir-amigo">
+            ${icono('chispa')}<span>Amigos y código de invitación</span>${icono('flecha')}
+          </button>
+          <button class="social-btn" data-accion="abrir-curso">
+            ${img('globe', 'ico-mini')}<span>Modo curso</span>${icono('flecha')}
+          </button>
+          <button class="social-btn apagado" data-accion="logout">
+            ${icono('cerrar')}<span>Cerrar sesión</span>
+          </button>
+        </div>`;
+    }
+    return `
+      <button class="social-banner" data-accion="abrir-auth">
+        ${img('trophy', 'ico-banner')}
+        <div>
+          <b>Liga real con amigos</b>
+          <p class="mini">Conéctate para competir con tus amigos de verdad.</p>
+        </div>
+        ${icono('flecha')}
+      </button>`;
   }
 
   // ---------------- PROGRESO ----------------
@@ -504,5 +561,123 @@ const UI = (() => {
       </div>`;
   }
 
-  return { bienvenida, onboarding, inicio, retos, liga, progreso, hoja, subioNivel, logroNuevo, logroInfo, infoEscudo, recordatorio, compartir, verFoto, icono };
+  // ---------------- HOJA AUTH ----------------
+  function authSheet(modo = 'login') {
+    const esr = modo === 'registro';
+    return `
+      <div class="hoja-fondo" data-cerrar></div>
+      <div class="hoja">
+        <div class="agarre"></div>
+        <div class="hoja-img">${img('trophy', 'flota')}</div>
+        <h3>Liga real</h3>
+        <p class="hoja-info">Conéctate para competir con amigos y unirte a un curso.</p>
+        <div class="auth-tabs">
+          <button type="button" class="${!esr ? 'sel' : ''}" data-auth-modo="login">Entrar</button>
+          <button type="button" class="${esr ? 'sel' : ''}" data-auth-modo="registro">Registrarse</button>
+        </div>
+        <form id="form-auth" data-modo="${modo}">
+          ${esr ? `<input name="nombre" class="input-campo" placeholder="Nombre (máx. 20 caracteres)" maxlength="20" required autocomplete="given-name">` : ''}
+          <input name="email" type="email" class="input-campo" placeholder="Correo" required autocomplete="email">
+          <input name="password" type="password" class="input-campo" placeholder="Contraseña" minlength="6" required autocomplete="${esr ? 'new-password' : 'current-password'}">
+          <p class="auth-error" id="auth-error" hidden></p>
+          <button class="btn-primario ancho" type="submit">${esr ? 'Crear cuenta' : 'Entrar'} ${icono('flecha')}</button>
+        </form>
+      </div>`;
+  }
+
+  // ---------------- HOJA AMIGOS ----------------
+  function amigoSheet(codigoPropio) {
+    return `
+      <div class="hoja-fondo" data-cerrar></div>
+      <div class="hoja">
+        <div class="agarre"></div>
+        <h3>Agregar amigos</h3>
+        <div class="mi-codigo">
+          <p class="mini centro">Tu código para invitar</p>
+          <span class="codigo-grande" data-accion="copiar-codigo">${esc(codigoPropio || '---')}</span>
+          <p class="mini centro">Toca para copiar y compártelo</p>
+        </div>
+        <form id="form-amigo">
+          <input name="codigo" class="input-campo" placeholder="Código de tu amigo" maxlength="6" required autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase">
+          <p class="auth-error" id="amigo-error" hidden></p>
+          <button class="btn-primario ancho" type="submit">Agregar amigo ${icono('flecha')}</button>
+        </form>
+      </div>`;
+  }
+
+  // ---------------- HOJA CURSO ----------------
+  function cursoSheet(cursos) {
+    const { comoProfe = [], comoAlumno = [] } = cursos || {};
+    const todos = [
+      ...comoProfe.map(c => ({ ...c, esProfe: true })),
+      ...comoAlumno.map(c => ({ ...c, esProfe: false })),
+    ];
+    return `
+      <div class="hoja-fondo" data-cerrar></div>
+      <div class="hoja">
+        <div class="agarre"></div>
+        <div class="hoja-img">${img('globe', 'flota')}</div>
+        <h3>Modo curso</h3>
+        ${todos.length ? `
+          <div class="mis-cursos">
+            ${todos.map(c => `
+              <button class="fila-curso" data-ver-curso="${c.id}" data-curso-nombre="${esc(c.nombre)}" data-curso-codigo="${esc(c.codigo)}">
+                <div><b>${esc(c.nombre)}</b><span class="mini">Código: ${esc(c.codigo)}${c.esProfe ? ' · Profe' : ''}</span></div>
+                ${icono('flecha')}
+              </button>`).join('')}
+          </div>` : `<p class="hoja-info">Únete al curso de tu profe o crea uno para tu clase.</p>`}
+        <div class="auth-tabs" id="curso-tabs">
+          <button type="button" class="sel" data-curso-modo="unirse">Unirse</button>
+          <button type="button" data-curso-modo="crear">Crear</button>
+        </div>
+        <form id="form-curso" data-modo="unirse">
+          <input name="codigo-curso" class="input-campo campo-unirse" placeholder="Código del curso" maxlength="6" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform:uppercase">
+          <input name="nombre-curso" class="input-campo campo-crear" placeholder="Nombre del curso" maxlength="40" style="display:none">
+          <p class="auth-error" id="curso-error" hidden></p>
+          <button class="btn-primario ancho" type="submit" id="btn-curso">Unirse ${icono('flecha')}</button>
+        </form>
+      </div>`;
+  }
+
+  // ---------------- DETALLE CURSO (profe) ----------------
+  function cursoDetalle(curso, impacto) {
+    const avatar = f => `<span class="avatar" style="--h:${(f.nombre.charCodeAt(0) * 37) % 360}">${esc(f.nombre[0] || '?').toUpperCase()}</span>`;
+    if (!impacto) {
+      return `
+        <div class="hoja-fondo" data-cerrar></div>
+        <div class="hoja">
+          <div class="agarre"></div>
+          <span class="chip-cat">Código: ${esc(curso.codigo || '---')}</span>
+          <h3>${esc(curso.nombre)}</h3>
+          <p class="mini centro">Cargando...</p>
+        </div>`;
+    }
+    const { filas, total } = impacto;
+    return `
+      <div class="hoja-fondo" data-cerrar></div>
+      <div class="hoja">
+        <div class="agarre"></div>
+        <span class="chip-cat">Código: ${esc(curso.codigo || '---')}</span>
+        <h3>${esc(curso.nombre)}</h3>
+        <div class="impacto-chips">
+          <span><b>${total.retos}</b> retos</span>
+          <span><b>${fmt(total.co2, 1)} kg</b> CO₂</span>
+          <span><b>${fmt(total.agua)} L</b> agua</span>
+          <span><b>${fmt(total.plastico)} g</b> plástico</span>
+        </div>
+        <div class="liga">
+          ${filas.map((f, i) => `
+            <div class="fila-liga ${f.yo ? 'yo' : ''}" style="--i:${i}">
+              <span class="pos">${i + 1}</span>
+              ${avatar(f)}
+              <span class="nombre">${esc(f.nombre)}${f.yo ? ' (tú)' : ''}</span>
+              <span class="pts">${f.retos} retos</span>
+            </div>`).join('')}
+          ${!filas.length ? '<p class="nota">Ningún alumno ha sincronizado datos esta semana.</p>' : ''}
+        </div>
+        <button class="btn-secundario ancho" data-cerrar>Cerrar</button>
+      </div>`;
+  }
+
+  return { bienvenida, onboarding, inicio, retos, liga, progreso, hoja, subioNivel, logroNuevo, logroInfo, infoEscudo, recordatorio, compartir, verFoto, icono, authSheet, amigoSheet, cursoSheet, cursoDetalle };
 })();

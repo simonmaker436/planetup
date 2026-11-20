@@ -2,8 +2,10 @@
 // app.js — Arranque, navegación, hojas, celebraciones y eventos
 // ============================================================
 
-(() => {
+(async () => {
   let state = Store.load();
+  await Auth.init();
+
   let tab = 'inicio';
   let filtro = 'todas';
   let editandoNombre = false;
@@ -15,6 +17,9 @@
   const $toast = document.getElementById('toast');
   const $sheet = document.getElementById('sheet');
   const $overlay = document.getElementById('overlay');
+
+  // Re-render liga cuando cambia la sesión
+  Auth.onAuthChange(() => { if (tab === 'liga') render(false); });
 
   const guardar = () => Store.save(state);
   const globo = (fn, ...args) => { if (window.PlanetGlobe) window.PlanetGlobe[fn](...args); };
@@ -54,8 +59,27 @@
       $main.className = 'animar';
       return;
     }
+
     $tabs.hidden = false;
-    const pantallas = { inicio: UI.inicio, retos: s => UI.retos(s, filtro), liga: UI.liga, progreso: UI.progreso };
+
+    if (tab === 'liga') {
+      $main.innerHTML = UI.liga(state, Auth.loggedIn() ? null : undefined);
+      $main.className = animar ? 'animar' : '';
+      if (animar) FX.contar($main);
+      moverIndicador();
+      ajustarEspacio();
+      guardar();
+      if (Auth.loggedIn()) {
+        Social.obtenerLiga().then(ligaData => {
+          if (tab !== 'liga') return;
+          $main.innerHTML = UI.liga(state, ligaData || []);
+          FX.contar($main);
+        });
+      }
+      return;
+    }
+
+    const pantallas = { inicio: UI.inicio, retos: s => UI.retos(s, filtro), progreso: UI.progreso };
     $main.innerHTML = pantallas[tab](state);
     $main.className = animar ? 'animar' : '';
     if (animar) FX.contar($main);
@@ -149,6 +173,7 @@
     const yaEstaba = Logic.hechosHoy(state).includes(id);
     Logic.toggleReto(state, id);
     guardar();
+    Social.sincronizarPuntos(state); // fire and forget — sube puntos e impacto si está logueado
     if (desdeHoja) cerrarHoja();
     render(false);
 
@@ -194,10 +219,71 @@
     guardar(); render(true);
   }
 
+  // ---------- Handlers sociales async ----------
+  async function manejarAuth(form) {
+    const modo = form.dataset.modo;
+    const btn = form.querySelector('[type=submit]');
+    btn.disabled = true;
+    btn.innerHTML = `Espera... ${UI.icono('reloj')}`;
+
+    let res;
+    if (modo === 'registro') {
+      res = await Auth.registrar(form.email.value, form.password.value, form.nombre?.value || '');
+    } else {
+      res = await Auth.entrar(form.email.value, form.password.value);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = `${modo === 'registro' ? 'Crear cuenta' : 'Entrar'} ${UI.icono('flecha')}`;
+    const errEl = document.getElementById('auth-error');
+    if (!errEl) return;
+
+    if (res.confirmacion) {
+      errEl.textContent = 'Revisa tu correo y toca el enlace de confirmación para activar tu cuenta.';
+      errEl.style.color = 'var(--verde)';
+      errEl.hidden = false;
+      return;
+    }
+    if (res.error) { errEl.textContent = res.error; errEl.hidden = false; return; }
+    cerrarHoja();
+    render(false);
+  }
+
+  async function manejarAmigo(form) {
+    const btn = form.querySelector('[type=submit]');
+    btn.disabled = true;
+    const res = await Social.agregarAmigo(form.codigo.value.toUpperCase());
+    btn.disabled = false;
+    const errEl = document.getElementById('amigo-error');
+    if (!errEl) return;
+    if (res?.error) { errEl.textContent = res.error; errEl.hidden = false; return; }
+    toast('Amigo añadido');
+    cerrarHoja();
+    if (tab === 'liga') render(false);
+  }
+
+  async function manejarCurso(form) {
+    const modo = form.dataset.modo;
+    const btn = form.querySelector('[type=submit]');
+    btn.disabled = true;
+    let res;
+    if (modo === 'crear') {
+      res = await Social.crearCurso(form['nombre-curso'].value);
+    } else {
+      res = await Social.unirseACurso(form['codigo-curso'].value.toUpperCase());
+    }
+    btn.disabled = false;
+    const errEl = document.getElementById('curso-error');
+    if (!errEl) return;
+    if (res?.error) { errEl.textContent = res.error; errEl.hidden = false; return; }
+    toast(modo === 'crear' ? `Curso creado: ${res.curso?.nombre}` : `Te uniste a: ${res.curso?.nombre}`);
+    cerrarHoja();
+  }
+
   // ---------- Eventos ----------
   document.addEventListener('click', e => {
     if (e.target.closest('[data-cerrar]')) return e.target.closest('#overlay') ? cerrarCapa() : cerrarHoja();
-    const el = e.target.closest('[data-reto],[data-animo],[data-tab],[data-filtro],[data-accion],[data-abrir],[data-opcion],[data-onb],[data-logro],[data-ver-foto],[data-borrar-foto]');
+    const el = e.target.closest('[data-reto],[data-animo],[data-tab],[data-filtro],[data-accion],[data-abrir],[data-opcion],[data-onb],[data-logro],[data-ver-foto],[data-borrar-foto],[data-auth-modo],[data-curso-modo],[data-ver-curso]');
     if (!el || el.disabled) return;
     const d = el.dataset;
 
@@ -217,6 +303,37 @@
       tab = d.tab; window.scrollTo(0, 0); FX.vibrar(6); return render(true);
     }
     if (d.filtro) { filtro = d.filtro; render(false); $main.querySelector('.grilla')?.classList.add('animar-grilla'); return; }
+
+    // Tabs de auth/curso dentro de la hoja
+    if (d.authModo) {
+      $sheet.innerHTML = UI.authSheet(d.authModo);
+      activarArrastre($sheet.querySelector('.hoja'));
+      return;
+    }
+    if (d.cursoModo) {
+      const modo = d.cursoModo;
+      document.getElementById('curso-tabs')?.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.cursoModo === modo));
+      const form = document.getElementById('form-curso');
+      if (form) {
+        form.dataset.modo = modo;
+        form.querySelector('.campo-unirse').style.display = modo === 'unirse' ? '' : 'none';
+        form.querySelector('.campo-crear').style.display = modo === 'crear' ? '' : 'none';
+        const btn = document.getElementById('btn-curso');
+        if (btn) btn.innerHTML = `${modo === 'unirse' ? 'Unirse' : 'Crear curso'} ${UI.icono('flecha')}`;
+      }
+      return;
+    }
+    if (d.verCurso) {
+      const nombre = el.dataset.cursoNombre || 'Curso';
+      const codigo = el.dataset.cursoCodigo || '';
+      abrirHoja(UI.cursoDetalle({ id: d.verCurso, nombre, codigo }, null));
+      Social.obtenerImpactoCurso(d.verCurso).then(impacto => {
+        if ($sheet.hidden) return;
+        $sheet.innerHTML = UI.cursoDetalle({ id: d.verCurso, nombre, codigo }, impacto);
+        activarArrastre($sheet.querySelector('.hoja'));
+      });
+      return;
+    }
 
     // Onboarding
     if (d.opcion) {
@@ -252,7 +369,7 @@
       case 'guardar-recordatorio': {
         const v = document.getElementById('hora-recordatorio').value || '19:00';
         let [h, m] = v.split(':').map(Number);
-        m = Math.round(m / 15) * 15; if (m === 60) { m = 0; h = (h + 1) % 24; } // archivos cada 15 min
+        m = Math.round(m / 15) * 15; if (m === 60) { m = 0; h = (h + 1) % 24; }
         state.recordatorio = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
         guardar(); cerrarHoja(); render(false);
         return Tarjeta.abrirRecordatorio(state.recordatorio);
@@ -260,6 +377,21 @@
       case 'quitar-recordatorio': state.recordatorio = null; guardar(); cerrarHoja(); toast('Recordatorio quitado. Bórralo también de tu calendario.'); return render(false);
       case 'compartir': return abrirTarjeta();
       case 'compartir-ya': if (tarjetaActual) Tarjeta.compartir(tarjetaActual.blob); return;
+      case 'abrir-auth': return abrirHoja(UI.authSheet());
+      case 'abrir-amigo':
+        Social.obtenerPerfil().then(p => abrirHoja(UI.amigoSheet(p?.codigo)));
+        return;
+      case 'abrir-curso':
+        Social.obtenerMisCursos().then(cursos => abrirHoja(UI.cursoSheet(cursos)));
+        return;
+      case 'logout':
+        Auth.salir().then(() => render(false));
+        return;
+      case 'copiar-codigo': {
+        const codigo = el.textContent?.trim();
+        if (codigo) navigator.clipboard?.writeText(codigo).then(() => toast('Código copiado'));
+        return;
+      }
       case 'reset':
         // Doble toque para confirmar (sin ventanas emergentes)
         if (d.confirmar) { state = Store.reset(); tab = 'inicio'; editandoNombre = false; onb = null; return render(true); }
@@ -275,16 +407,20 @@
   });
 
   document.addEventListener('submit', e => {
-    if (e.target.id !== 'form-nombre') return;
-    e.preventDefault();
-    const n = document.getElementById('input-nombre').value.trim();
-    if (!n) return;
-    const nuevo = !state.nombre || !state.perfil;
-    state.nombre = n.slice(0, 20);
-    editandoNombre = false;
-    guardar(); document.activeElement?.blur();
-    if (nuevo && !state.perfil) return empezarOnboarding();
-    render(true);
+    if (e.target.id === 'form-nombre') {
+      e.preventDefault();
+      const n = document.getElementById('input-nombre').value.trim();
+      if (!n) return;
+      const nuevo = !state.nombre || !state.perfil;
+      state.nombre = n.slice(0, 20);
+      editandoNombre = false;
+      guardar(); document.activeElement?.blur();
+      if (nuevo && !state.perfil) return empezarOnboarding();
+      return render(true);
+    }
+    if (e.target.id === 'form-auth')  { e.preventDefault(); return manejarAuth(e.target); }
+    if (e.target.id === 'form-amigo') { e.preventDefault(); return manejarAmigo(e.target); }
+    if (e.target.id === 'form-curso') { e.preventDefault(); return manejarCurso(e.target); }
   });
 
   // El planeta se mueve un poco con el scroll (efecto profundidad)
